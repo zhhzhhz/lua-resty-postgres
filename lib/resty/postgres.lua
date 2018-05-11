@@ -18,9 +18,27 @@ local AUTH_REQ_OK = "\00\00\00\00"
 
 local mt = { __index = _M }
 
+--hex to binary function
+local function hex2bin( hexstr )  
+    local str = ''
+    local len = #hexstr
+    for i = 3, len - 1, 2 do    
+        local doublebytestr = string.sub(hexstr, i, i+1);    
+        local n = tonumber(doublebytestr, 16);    
+        if 0 == n then 
+            str = str .. '\00'  
+        else
+            str = str .. string.format("%c", n)  
+        end
+    end   
+    return str  
+end 
+
 local converters = {}
+-- Bytea data need unescape to real binary data
+converters[17] = hex2bin
 -- INT8OID
-converters[20] = tonumber
+converters[20] = nil   --int64 data returns as string
 -- INT2OID
 converters[21] = tonumber
 -- INT2VECTOROID
@@ -434,4 +452,3 @@ local class_mt = {
 }
 
 setmetatable(_M, class_mt)
-
