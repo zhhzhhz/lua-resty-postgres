@@ -29,7 +29,7 @@ end
 
 <h1>
 <a name="update" class="anchor" href="#update"><span class="mini-icon mini-icon-link"></span></a>
-update
+Update
 </h1>
 <p>zhhzhhz (张浩)<a href="mailto:zhhzhhz@outlook.com">zhhzhhz@outlook.com</a></p>
 
