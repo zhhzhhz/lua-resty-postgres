@@ -38,7 +38,7 @@ local converters = {}
 -- Bytea data need unescape to real binary data
 converters[17] = hex2bin
 -- INT8OID
-converters[20] = nil   --int64 data returns as string
+converters[20] = nil   --int64不转换为number，lua5.1支持不好
 -- INT2OID
 converters[21] = tonumber
 -- INT2VECTOROID
@@ -136,7 +136,25 @@ function _parse_error_packet(packet)
        if flg == '\0' then
           break
        end
-       -- all flg S/C/M/P/F/L/R
+
+       -- all flg S/V/C/M/D/H/P/p/q/W/s/t/c/d/n/F/L/R
+       -- refer https://www.postgresql.org/docs/10/static/protocol-error-fields.html
+       -- S/V : Severity
+       -- C : Code: the SQLSTATE code for the error 
+       -- M : Message: the primary human-readable error message
+       -- D : Detail
+       -- H : Hint: an optional suggestion what to do about the problem
+       -- P : Position
+       -- p : Internal position
+       -- q : Internal query
+       -- W : Where: an indication of the context in which the error occurred
+       -- s : Schema name
+       -- t : Table name
+       -- c : Column name
+       -- d : Data type name
+       -- n : Constraint name
+       -- debug flag  F,L,R : File,Line,Routine
+
        value, pos = _from_cstring(packet, pos)
        if not value then
            return nil, "parse error packet fail"
@@ -167,6 +185,7 @@ function _recv_packet(self)
     if not data then
         return nil, nil, "failed to read packet content: " .. err
     end
+    --ngx.log(ngx.INFO, typ..'/'..len..'/'..data)
     return data, typ
 end
 
@@ -248,11 +267,22 @@ function connect(self, opts)
     if typ ~= 'R' then
         return nil, "handshake error, got packet type:" .. typ
     end
-    local auth_type = string.sub(packet, 1, 4)
+    --Authentication Type 验证类型
+    --2 声明需要 Kerberos V5 认证
+    --3 声明需要一个明文的口令
+    --4 声明需要一个 crypt() 加密的口令。
+    --5 声明需要一个 MD5 加密的口令
+    local auth_type = _get_byte4(string.sub(packet, 1, 4),1)
     local salt = string.sub(packet, 5, 8)
     -- send passsowrd
-    req = {_to_cstring(_compute_token(self, user, password, salt))}
-    req_len = 40
+    if auth_type == 3 then
+      req = {_to_cstring(password)}
+      req_len = #password + 1 + 4
+    elseif auth_type == 5 then
+      req = {_to_cstring(_compute_token(self, user, password, salt))}
+      req_len = 40  -- len(req) + len(int) = 36 + 4
+    end
+    --ngx.log(ngx.INFO, string.format('auth_type:%s, data_len:%s', auth_type, string.len(req[1][1])))
     local bytes, err = _send_packet(self, req, req_len, 'p')
     if not bytes then
         return nil, "failed to send client authentication packet2: " .. err
@@ -260,6 +290,9 @@ function connect(self, opts)
     -- receive response
     packet, typ, err = _recv_packet(self)
     if typ ~= 'R' then
+        --[[if typ == 'E' then
+            return nil,packet
+        end--]]
         return nil, "auth return type not support"
     end
     if packet ~= AUTH_REQ_OK then
@@ -287,7 +320,7 @@ function connect(self, opts)
         -- error
         if typ == 'E' then
             local msg = _parse_error_packet(packet)
-            return nil, "Get error packet:" .. msg.M
+            return nil, "Get error packet:" .. msg.M, msg.C
         end
         -- ready for new query
         if typ == 'Z' then
@@ -357,7 +390,7 @@ function read_result(self)
     local res = {}
     local fields = {}
     local field_ok = false
-    local packet, typ, err
+    local packet, typ, err, errcode
     while true do
         packet, typ, err = _recv_packet(self)
         if not packet then
@@ -396,6 +429,8 @@ function read_result(self)
                     data, pos = _get_data_n(packet, len, pos)
                 end
                 local field = fields[i]
+                --ngx.log(ngx.INFO, string.format("%s,%s,%s,%s,%s,%s",field.name,field.table_id,field.field_id,field.type_id,field.type_len,len))
+                --ngx.log(ngx.INFO, data)
                 local conv = converters[field.type_id]
                 if conv and data ~= ngx.null then
                     data = conv(data)
@@ -413,8 +448,10 @@ function read_result(self)
             -- error packet
             local msg = _parse_error_packet(packet)
             err = msg.M
+            errcode = msg.C
             res = nil
-            break
+            --do not break,there have something in buffer need to read,otherwise will cause the func set_keepalive fail
+            --break
         end
         if typ == 'C' then
             -- read complete
@@ -427,7 +464,7 @@ function read_result(self)
             break
         end
     end   
-    return res, err
+    return res, err, errcode
 end
 
 function query(self, query)
