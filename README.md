@@ -1,4 +1,4 @@
-lua-resty-postgres
+#    lua-resty-postgres
 ==================
 
 Nonblocking Lua PostgreSQL driver library for ngx_lua
@@ -27,12 +27,22 @@ for i,v in ipairs(res) do
 end
 </pre>
 
+<h1>
+<a name="update" class="anchor" href="#update"><span class="mini-icon mini-icon-link"></span></a>
+update
+</h1>
+<p>zhhzhhz (张浩)<a href="mailto:zhhzhhz@outlook.com">zhhzhhz@outlook.com</a></p>
+
+* 1.support AuthenticationCleartextPassword
+* 2.add error code return as third parameter
+* 3.fix bug
 
 <h1>
 <a name="author" class="anchor" href="#author"><span class="mini-icon mini-icon-link"></span></a>
 Author
 </h1>
 <p>Azure Wang (王非)<a href="mailto:azure1st@gmail.com">azure1st@gmail.com</a></p>
+
 
 <h1>
 <a name="copyright-and-license" class="anchor" href="#copyright-and-license"><span class="mini-icon mini-icon-link"></span></a>
@@ -47,7 +57,7 @@ Copyright and License
 <p>Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:</p>
 
 <ul>
-	<li>
+    <li>
 	<p>Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.</p>
 </li>
 <li>
